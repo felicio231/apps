@@ -1,72 +1,30 @@
 workflows:
-  ios-workflow:
-    name: SiteNative iOS without OneSignal
+  android-workflow:
+    name: SiteNative Android aab
     max_build_duration: 30
     environment:
       vars:
-        XCODE_WORKSPACE: "Runner.xcworkspace"
-        XCODE_SCHEME: "Runner"
-        APP_STORE_CONNECT_ISSUER_ID: duoticketportal
-        APP_STORE_CONNECT_KEY_IDENTIFIER: 475234YCY3
-        APP_STORE_CONNECT_PRIVATE_KEY: |-
-         -----BEGIN PRIVATE KEY-----
-         MIGTAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBHkwdwIBAQQgY+B83n7dvkHGIl9W
-         ZqW3cEUrPwlA5uvgu2ZDDxUGMj6gCgYIKoZIzj0DAQehRANCAAQJ+2KCCmyLFODl
-         gfwOx8VKpBDNUPytkEsLvhgl+yi+BrVA4wnKZgnaDGycjR3T7VgaVf+PfXB94KbA
-         usGOXUM9
-         -----END PRIVATE KEY-----
-
-        CERTIFICATE_PRIVATE_KEY: |-
-         -----BEGIN CERTIFICATE REQUEST-----
-         MIICkjCCAXoCAQAwTTEqMCgGCSqGSIb3DQEJARYbaGVkdWFyZG9mZWxpY2lvQGhv
-         dG1haWwuY29tMRIwEAYDVQQDDAlEdW90aWNrZXQxCzAJBgNVBAYTAkJSMIIBIjAN
-         BgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyl+2+X9iIpeAH9ZmRH3WBEh9T4Qm
-         GkZOh58FkZA606p/5J8Ia1jFKt6UnnQww1IVxWcq24AWEbctvU1Mm2xg9MGAR5r8
-         oTflY6bn2mWBoXD5OxEmRg0Od76Yxw6ap55r6gDO/q/WpVyYwdmWq3Igv/gqLiPg
-         eDKau1I+dt0u22qeHZSxw9IBexFt4hA8vZxQsO6vwak8lwJMg2P4kHrw4wUdxbTC
-         R4amz7AASSrkS62kE/38oVbfmCkru83CdTtlFt4K0TrC1Bm7teFYYDbfbYcY93xc
-         O2uSrWtp8q6wvB4nZuVbvBmva935bHE5YB6z1xvnSwT9lcyKmfkM4MZVtQIDAQAB
-         oAAwDQYJKoZIhvcNAQELBQADggEBAJKye6NgzDPamwfAIDTpt4x/l45oAWKZOvik
-         /CoeIzKQFi1j+/bkH6flahkPXxcpQ/2ML//X7rfdwiawiKj7rDgoV3JGUx6g/cw9
-         idHa9IRh4hq3NirjFnUY3on0pVOiaW5L5+9/iHsnkkFF8b4xF2NsCfiKQrjxgImR
-         L24sN+XgK4Ui8h+E1Yw5SFHNlNwb7Q6ZzAs0ldjVa1YQA6QmOhl6PLqm/EsHw0Rm
-         wHpW8Oh9RKond7aCMCxNHA9ZP4AbKNABsH0bpt7JFTL4KY0ZOh3Uz6roY5Z+b9tn
-         eLT4WDLv0306Ft0KiJw7cJoS40WlanvrSIdZiDfbuRtubHS+21o=
-         -----END CERTIFICATE REQUEST-----
-         
-
-        BUNDLE_ID: "br.com.duoticket"
+        PACKAGE_NAME: "br.com.duoticket"
       flutter: stable
       xcode: latest
       cocoapods: default
     scripts:
-      - name: Set up keychain to be used for codesigning using Codemagic CLI 'keychain' command
+      - name: Set up local.properties
         script: |
-          keychain initialize
-      - name: Fetch signing files
-        script: |
-          app-store-connect fetch-signing-files $BUNDLE_ID --type IOS_APP_STORE --create --log-api-calls --verbose
-      - name: Use system default keychain
-        script: |
-          keychain add-certificates
-      - name: Set up code signing settings on Xcode project
-        script: |
-          xcode-project use-profiles
+          echo "flutter.sdk=$HOME/programs/flutter" > "$FCI_BUILD_DIR/android/local.properties"
       - name: Get Flutter packages
         script: |
           cd . && flutter packages pub get
       - name: Install pods
         script: |
           find . -name "Podfile" -execdir pod install \;
-      - name: Flutter build ipa and automatic versioning
+      - name: Build AAB with Flutter
         script: |
-          flutter build ipa --release \
-          --build-name=1.0.0 \
-          --build-number=$(($(app-store-connect get-latest-testflight-build-number "$APP_STORE_ID") + 1)) \
-          --export-options-plist=/Users/builder/export_options.plist
+          cd . && flutter build appbundle --release --build-name=1.0.0 --build-number=$(($(google-play get-latest-build-number --package-name "$PACKAGE_NAME" --tracks="$GOOGLE_PLAY_TRACK") + 1))
     artifacts:
-      - build/ios/ipa/*.ipa
-      - /tmp/xcodebuild_logs/*.log
+      - build/**/outputs/**/*.apk
+      - build/**/outputs/**/*.aab
+      - build/**/outputs/**/mapping.txt
       - flutter_drive.log
     publishing:
       scripts:
